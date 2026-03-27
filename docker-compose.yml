@@ -1,0 +1,50 @@
+# OS-APOW Docker Compose
+# Local development environment configuration
+
+services:
+  notifier:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: os-apow-notifier
+    ports:
+      - "8000:8000"
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - GITHUB_ORG=${GITHUB_ORG}
+      - GITHUB_REPO=${GITHUB_REPO}
+    healthcheck:
+      # Use Python stdlib for healthcheck (NOT curl)
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - os-apow-network
+
+  sentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: os-apow-sentinel
+    command: ["python", "-m", "os_apow.services.sentinel"]
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_ORG=${GITHUB_ORG}
+      - GITHUB_REPO=${GITHUB_REPO}
+      - SENTINEL_BOT_LOGIN=${SENTINEL_BOT_LOGIN:-}
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    networks:
+      - os-apow-network
+    profiles:
+      - sentinel
+
+networks:
+  os-apow-network:
+    driver: bridge
